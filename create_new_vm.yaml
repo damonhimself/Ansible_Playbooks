@@ -1,0 +1,56 @@
+---
+- name: Deploy {{ guest }}
+  vmware_guest:
+    hostname: '{{ vcenter_hostname }}'
+    username: 'corp\{{ vsphere_user }}'
+    password: '{{ vsphere_pass }}'
+    validate_certs: no
+    datacenter: '{{ dc }}'
+    esxi_hostname: '{{ esxi_hostname }}'
+    name: '{{ guest }}'
+    template: '{{ template }}'
+    folder: '{{ folder }}'
+    annotation: '{{ notes }}'
+    disk:
+    - size_gb: 80
+      type: thin
+      datastore: '{{ datastore }}'
+    hardware:
+      num_cpus: '{{ cpus | default(2) }}'
+      memory_mb: '{{ mem | default(4096) }}'
+    networks:
+    - name: '{{ vlan }}'
+      ip: '{{ ipaddr }}'
+      netmask: '{{ netm }}'
+      gateway: '{{ gw }}'
+      type: static
+    wait_for_ip_address: true
+    state: poweredon
+
+- name: Setup new VM Guest {{ guest }} hostname and running setup script
+  local_action:
+    module: vmware_vm_shell
+    hostname: '{{ vcenter_hostname }}'
+    username: 'corp\{{ vsphere_user }}'
+    password: '{{ vsphere_pass }}'
+    validate_certs: no
+    datacenter: '{{ dc }}'
+    vm_id: '{{ guest }}'
+    vm_username: '{{ installerid }}'
+    vm_password: '{{ installerpass }}'
+    vm_shell: /usr/bin/hostnamectl
+    vm_shell_args: " set-hostname '{{ fqdn }}' ; /usr/bin/wget http://10.100.100.100/setup.sh -O /root/setup.sh ; /usr/bin/chmod 700 /root/setup.sh ; /usr/bin/nohup /root/setup.sh ; wget http://10.100.100.00/kickstart/apps/satellite_add.sh && sh satellite_add.sh  & "
+
+- name: Registering new VM Guest {{ guest }} with Satellite
+  local_action:
+    module: vmware_vm_shell
+    hostname: '{{ vcenter_hostname }}'
+    username: 'corp\{{ vsphere_user }}'
+    password: '{{ vsphere_pass }}'
+    validate_certs: no
+    datacenter: '{{ dc }}'
+    vm_id: '{{ guest }}'
+    vm_username: '{{ installerid }}'
+    vm_password: '{{ installerpass }}'
+    vm_shell: /usr/bin/hostnamectl
+#    vm_shell_args: " wget http://10.100.10.100/kickstart/apps/satellite_add.sh && sh satellite_add.sh & "
